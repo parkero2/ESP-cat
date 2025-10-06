@@ -35,3 +35,23 @@ flowchart TD
         User -- "HTTP GET /speed?l=[int]&r=[int]" --> Server
         Server -- "Sets motor speeds" --> Motors
 ```
+- **/speed?l=[int]&r=[int]**: Sets the speed of the left (l) and right (r) motors. Speed values range from -255 to 255.
+- **TB6612FNG** is used in a tank drive configuration.
+## HTML Build Process Diagram
+
+```mermaid
+flowchart TD
+    A["index.html (Source HTML)"]
+    B["html-minify.py"]
+    C["index-min.html (Minified HTML)"]
+    D["headerfy.py"]
+    E["index-min.h (C Header for ESP32)"]
+
+    A -- "Minify HTML, CSS, JS" --> B
+    B -- "Output minified HTML" --> C
+    C -- "Convert to C header" --> D
+    D -- "Output header file" --> E
+```
+
+- **html-minify.py**: Minifies HTML, CSS, and JS from `index.html` to produce `index-min.html`.
+- **headerfy.py**: Converts `index-min.html` into a C header file (`index-min.h`) for embedding in ESP32 firmware.
