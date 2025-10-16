@@ -1,6 +1,8 @@
 #include "esp_camera.h"
 #include <WiFi.h>
 
+// BEGIN PIN DEF
+const int LF = 2, LB = 15, RF = 16, RB = 17, LSP_PWM = 12, RSP_PWM = 13;
 
 //
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
@@ -43,10 +45,25 @@ const char *password = "Arachne20!9";
 void startCameraServer();
 void setupLedFlash(int pin);
 
+// // Tank drive control functions
+// void setSpeed(int l = 128, int r = 128);
+// void fwd();
+// void bck();
+// void lft();
+// void rgt();
+
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
+
+  // Initialize motor control pins
+  pinMode(LF, OUTPUT);
+  pinMode(LB, OUTPUT);
+  pinMode(RF, OUTPUT);
+  pinMode(RB, OUTPUT);
+  pinMode(LSP_PWM, OUTPUT);
+  pinMode(RSP_PWM, OUTPUT);
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -150,6 +167,54 @@ void setup() {
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
+}
+
+// Tank drive control functions
+int leftSpeed = 128;
+int rightSpeed = 128;
+
+void setSpeed(int l, int r) {
+  // constrain method ensures values are between 0 and 255, similar to map
+  leftSpeed = constrain(l, 0, 255);
+  rightSpeed = constrain(r, 0, 255);
+  analogWrite(LSP_PWM, leftSpeed);
+  analogWrite(RSP_PWM, rightSpeed);
+}
+
+void fwd() {
+  digitalWrite(LF, HIGH);
+  digitalWrite(LB, LOW);
+  digitalWrite(RF, HIGH);
+  digitalWrite(RB, LOW);
+  analogWrite(LSP_PWM, leftSpeed);
+  analogWrite(RSP_PWM, rightSpeed);
+}
+
+void bck() {
+  digitalWrite(LF, LOW);
+  digitalWrite(LB, HIGH);
+  digitalWrite(RF, LOW);
+  digitalWrite(RB, HIGH);
+  analogWrite(LSP_PWM, leftSpeed);
+  analogWrite(RSP_PWM, rightSpeed);
+}
+
+void lft() {
+  digitalWrite(LF, LOW);
+  digitalWrite(LB, HIGH);
+  digitalWrite(RF, HIGH);
+  digitalWrite(RB, LOW);
+  analogWrite(LSP_PWM, leftSpeed);
+  analogWrite(RSP_PWM, rightSpeed);
+}
+
+void rgt() {
+  digitalWrite(LF, HIGH);
+  digitalWrite(LB, LOW);
+  digitalWrite(RF, LOW);
+  digitalWrite(RB, HIGH);
+  analogWrite(LSP_PWM, leftSpeed);
+  analogWrite(RSP_PWM, rightSpeed);
 }
 
 void loop() {
