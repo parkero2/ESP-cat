@@ -6,31 +6,16 @@
 // HTML content
 #include "index-min.h"
 
-// Modify these
-// Tank drive controls
-const int LF = 1, LB = 2, RF = 3, RB = 4;
+// Use the standard camera model definition
+#define CAMERA_MODEL_WROVER_KIT
+#include "camera_pins.h"
 
-// Camera pin definitions (ESP32-CAM AI-Thinker)
-#define PWDN_GPIO_NUM     32
-#define RESET_GPIO_NUM    -1
-#define XCLK_GPIO_NUM      0
-#define SIOD_GPIO_NUM     26
-#define SIOC_GPIO_NUM     27
-#define Y9_GPIO_NUM       35
-#define Y8_GPIO_NUM       34
-#define Y7_GPIO_NUM       39
-#define Y6_GPIO_NUM       36
-#define Y5_GPIO_NUM       21
-#define Y4_GPIO_NUM       19
-#define Y3_GPIO_NUM       18
-#define Y2_GPIO_NUM        5
-#define VSYNC_GPIO_NUM    25
-#define HREF_GPIO_NUM     23
-#define PCLK_GPIO_NUM     22
+// Tank drive controls (Updated to avoid camera pin conflicts)
+const int LF = 2, LB = 15, RF = 16, RB = 17, LSP_PWM = 12, RSP_PWM = 13;
 
 // WiFi credentials
-const char *ssid = "YOUR_SSID";
-const char *password = "YOUR_PASSWORD";
+const char *ssid = "Valleyview";
+const char *password = "Littleseven7!";
 
 // End of modifications
 
@@ -56,23 +41,59 @@ bool initCamera() {
     config.pin_pclk = PCLK_GPIO_NUM;
     config.pin_vsync = VSYNC_GPIO_NUM;
     config.pin_href = HREF_GPIO_NUM;
-    config.pin_sscb_sda = SIOD_GPIO_NUM;
-    config.pin_sscb_scl = SIOC_GPIO_NUM;
+    config.pin_sccb_sda = SIOD_GPIO_NUM;  // Fixed typo: was pin_sscb_sda
+    config.pin_sccb_scl = SIOC_GPIO_NUM;  // Fixed typo: was pin_sscb_scl
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;
     config.pixel_format = PIXFORMAT_JPEG;
+    config.frame_size = FRAMESIZE_VGA; // Start with smaller frame size
+    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+    config.jpeg_quality = 15; // Higher number = lower quality, less memory
+    config.fb_count = 1; // Start with single buffer
     
-    // Frame size and quality settings
-    config.frame_size = FRAMESIZE_VGA; // 640x480
-    config.jpeg_quality = 10; // 0-63, lower means higher quality
-    config.fb_count = 1;
+    // if PSRAM IC present, init with higher JPEG quality
+    if (config.pixel_format == PIXFORMAT_JPEG) {
+        if (psramFound()) {
+            Serial.println("PSRAM found - using high quality settings");
+            config.jpeg_quality = 12;
+            config.fb_count = 1; // Keep single buffer to avoid memory issues
+            config.grab_mode = CAMERA_GRAB_LATEST;
+            config.frame_size = FRAMESIZE_SVGA; // Try medium size first
+        } else {
+            Serial.println("No PSRAM found - using reduced settings");
+            // Limit the frame size when PSRAM is not available
+            config.frame_size = FRAMESIZE_QVGA;
+            config.fb_location = CAMERA_FB_IN_DRAM;
+        }
+    }
     
     // Initialize camera
+    Serial.println("Attempting camera initialization...");
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {
-        Serial.printf("Camera init failed with error 0x%x", err);
+        Serial.printf("Camera init failed with error 0x%x (%s)\n", err, esp_err_to_name(err));
+        Serial.println("Check camera module connection and pin definitions!");
         return false;
+    }
+    
+    // Get camera sensor and apply settings like the working example
+    sensor_t *s = esp_camera_sensor_get();
+    if (s) {
+        Serial.printf("Camera sensor detected: PID=0x%02x\n", s->id.PID);
+        
+        // Apply sensor-specific settings from working example
+        if (s->id.PID == OV3660_PID) {
+            s->set_vflip(s, 1);        // flip it back
+            s->set_brightness(s, 1);   // up the brightness just a bit
+            s->set_saturation(s, -2);  // lower the saturation
+        }
+        
+        // Set initial frame size for better frame rate
+        if (config.pixel_format == PIXFORMAT_JPEG) {
+            s->set_framesize(s, FRAMESIZE_QVGA);
+        }
     }
     
     return true;
@@ -82,32 +103,63 @@ bool initCamera() {
 /// @param leftSpeed The speed for the left motors (-255 to 255) Negative integers indicate reverse direction.
 /// @param rightSpeed The speed for the right motors (-255 to 255) Negative integers indicate reverse direction.
 void setSpeed(int leftSpeed = lsp, int rightSpeed = rsp) {
+    // Normalise values
+
     lsp = leftSpeed < -255 || leftSpeed > 255 ? lsp : leftSpeed;
     rsp = rightSpeed < -255 || rightSpeed > 255 ? rsp : rightSpeed;
+    analogWrite(LSP_PWM, lsp);
+    analogWrite(RSP_PWM, rsp);
 
-    // Left motors
-    if (lsp < 0) {
-        analogWrite(LF, 0);  // stop
-        analogWrite(LB, abs(lsp));
-    } else if (lsp > 0) {
-        analogWrite(LF, abs(lsp));
-        analogWrite(LB, 0);  // stop
+    // Determine direction of each side including left/right turns
+    if (lsp > 0 && rsp > 0) {
+        setFWD();
+    } else if (lsp < 0 && rsp < 0) {
+        setREV();
+    } else if (lsp > 0 && rsp < 0) {
+        setRGT();
+    } else if (lsp < 0 && rsp > 0) {
+        setLFT();
     } else {
-        analogWrite(LF, 0);  // stop
-        analogWrite(LB, 0);  // stop
+        setSTOP();
     }
 
-    // Right motors
-    if (rsp < 0) {
-        analogWrite(RF, LOW);
-        analogWrite(RB, abs(rsp));
-    } else if (rsp > 0) {
-        analogWrite(RF, abs(rsp));
-        analogWrite(RB, LOW);
-    } else {
-        analogWrite(RF, LOW);
-        analogWrite(RB, LOW);   
-    }
+}
+
+void setFWD() {
+    digitalWrite(RF, HIGH);
+    digitalWrite(LF, HIGH);
+    digitalWrite(RB, LOW);
+    digitalWrite(LB, LOW);
+}
+
+void setREV() {
+    digitalWrite(RF, LOW);
+    digitalWrite(LF, LOW);
+    digitalWrite(RB, HIGH);
+    digitalWrite(LB, HIGH);
+}
+
+void setLFT() {
+    digitalWrite(RF, HIGH);
+    digitalWrite(LF, LOW);
+    digitalWrite(RB, LOW);
+    digitalWrite(LB, HIGH);
+}
+
+void setRGT() {
+    digitalWrite(RF, LOW);
+    digitalWrite(LF, HIGH);
+    digitalWrite(RB, HIGH);
+    digitalWrite(LB, LOW);
+}
+
+
+
+void setSTOP() {
+    digitalWrite(RF, LOW);
+    digitalWrite(LF, LOW);
+    digitalWrite(RB, LOW);
+    digitalWrite(LB, LOW);
 }
 
 /* Server Routes */
