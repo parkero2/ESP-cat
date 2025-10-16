@@ -806,6 +806,78 @@
         fetchUrl(`${baseHost}/resolution?sx=${start_x}&sy=${start_y}&ex=${end_x}&ey=${end_y}&offx=${offset_x}&offy=${offset_y}&tx=${total_x}&ty=${total_y}&ox=${output_x}&oy=${output_y}&scale=${scaling}&binning=${binning}`, cb);
       }
 
+      // TANK DRIVE FUNCTIONS //
+
+      function drive_fwd() {
+        fetchUrl(`${baseHost}/tank?dir=fw`, function (code, txt) {
+          if (code != 200) {
+            alert('Error[' + code + ']: ' + txt);
+          }
+        });
+      }
+
+      function drive_bck() {
+        fetchUrl(`${baseHost}/tank?dir=bw`, function (code, txt) {
+          if (code != 200) {
+            alert('Error[' + code + ']: ' + txt);
+          }
+        });
+      }
+
+      function drive_left() {
+        fetchUrl(`${baseHost}/tank?dir=lt`, function (code, txt) {
+          if (code != 200) {
+            alert('Error[' + code + ']: ' + txt);
+          }
+        });
+      }
+
+      function drive_right() {
+        fetchUrl(`${baseHost}/tank?dir=rt`, function (code, txt) {
+          if (code != 200) {
+            alert('Error[' + code + ']: ' + txt);
+          }
+        });
+      }
+
+      function drive_stop() {
+        fetchUrl(`${baseHost}/tank?dir=st`, function (code, txt) {
+          if (code != 200) {
+            alert('Error[' + code + ']: ' + txt);
+          }
+        });
+      }
+
+      // END OF TANK DRIVE FUNCTIONS // 
+      // Attach tank drive button actions //
+
+      const forwardBtn = document.getElementById('forwardBtn');
+      forwardBtn.onclick = () => {
+        drive_fwd();
+      };
+
+      const backwardBtn = document.getElementById('backwardBtn');
+      backwardBtn.onclick = () => {
+        drive_bck();
+      };
+
+      const leftBtn = document.getElementById('leftBtn');
+      leftBtn.onclick = () => {
+        drive_left();
+      };
+
+      const rightBtn = document.getElementById('rightBtn');
+      rightBtn.onclick = () => {
+        drive_right();
+      };
+
+      const stopBtn = document.getElementById('stopBtn');
+      stopBtn.onclick = () => {
+        drive_stop();
+      };
+
+      // END OF TANK DRIVE BUTTON ACTIONS //
+
       const setRegButton = document.getElementById('set-reg')
       setRegButton.onclick = () => {
         let reg = parseInt(document.getElementById('reg-addr').value);
