@@ -382,6 +382,33 @@
     input.toggle-section-button:checked+section.toggle-section {
       display: none
     }
+
+    #tankDriveControls {
+      /* Bottom middle */
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 99;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border-radius: 10px;
+
+      /* center the buttons */
+      text-align: center;
+    }
+
+    #tankDriveControls button {
+      background-color: #ff3034;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      display: inline-block;
+    }
   </style>
 </head>
 
@@ -709,6 +736,15 @@
 
 
         </nav>
+      </div>
+      <div id="tankDriveControls">
+        <!-- fwd, bck, rotate left, rotate right -->
+        <button id="forwardBtn">⬆️</button><br>
+        <button id="leftBtn">↪️</button>
+        <button id="stopBtn">⏹️</button>
+        <button id="rightBtn">↩️</button>
+        <br>
+        <button id="backwardBtn">⬇️</button>
       </div>
       <figure>
         <div id="stream-container" class="image-container hidden">
