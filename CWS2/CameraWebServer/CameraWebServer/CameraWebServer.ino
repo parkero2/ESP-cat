@@ -57,13 +57,13 @@ void setup() {
   Serial.setDebugOutput(true);
   Serial.println();
 
-  // Initialize motor control pins
-  pinMode(LF, OUTPUT);
-  pinMode(LB, OUTPUT);
-  pinMode(RF, OUTPUT);
-  pinMode(RB, OUTPUT);
-  pinMode(LSP_PWM, OUTPUT);
-  pinMode(RSP_PWM, OUTPUT);
+  // // Initialize motor control pins
+  // pinMode(LF, OUTPUT);
+  // pinMode(LB, OUTPUT);
+  // pinMode(RF, OUTPUT);
+  // pinMode(RB, OUTPUT);
+  // pinMode(LSP_PWM, OUTPUT);
+  // pinMode(RSP_PWM, OUTPUT);
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
