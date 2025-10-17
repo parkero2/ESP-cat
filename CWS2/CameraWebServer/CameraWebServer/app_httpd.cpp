@@ -181,7 +181,7 @@ static size_t jpg_encode_stream(void *arg, size_t index, const void *data, size_
 /* START OF TANK DRIVE MODIFCATIONS */
 
 // Define a handler for `/tank` URI
-static esp_err_t tank_hander(httpd_req_t *req)
+static esp_err_t tank_handler(httpd_req_t *req)
 {
 
   char buf[100];            // Buffer to store the received data
@@ -898,8 +898,21 @@ static esp_err_t index_handler(httpd_req_t *req)
 
 void startCameraServer()
 {
+
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.max_uri_handlers = 16;
+
+  // DECLARE /tank handler
+  // uri : the route (/tank)
+  // method : method used to handle the request (GET)
+  // handler : the function handling the request (tank_handler)
+  httpd_uri_t tank_uri = {
+    .uri = "/tank",
+    .method = HTTP_GET,
+    .handler = tank_handler,
+    .user_ctx = NULL
+  };
+  
 
   httpd_uri_t index_uri = {
       .uri = "/",
@@ -1060,6 +1073,10 @@ void startCameraServer()
     httpd_register_uri_handler(camera_httpd, &greg_uri);
     httpd_register_uri_handler(camera_httpd, &pll_uri);
     httpd_register_uri_handler(camera_httpd, &win_uri);
+
+    // Register the /tank route handler
+    // Takes params server instance, pointer to uri handler struct
+    httpd_register_uri_handler(camera_httpd, &tank_uri);
   }
 
   config.server_port += 1;
