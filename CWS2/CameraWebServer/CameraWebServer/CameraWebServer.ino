@@ -1,17 +1,34 @@
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <SoftwareSerial.h>
+#include <DFPlayerMini_Fast.h>
 
 // BEGIN PIN DEF
 const int LF = 2, LB = 3, RF = 4, RB = 5, LSP_PWM = 9, RSP_PWM = 10;
-const bool initPins = true; // Flag used for testing. Some pins cause issues with camera
+const bool initPins = true;  // Flag used for testing. Some pins cause issues with camera
+
+const bool testUltrasonic = false;  // Flag to enable ultrasonic sensor testing
 
 // Secondary board pins
-const int SS_RX = 33, SS_TX = 32; // Soft serial RX/TX pins.
+const int SS_RX = 33, SS_TX = 32;  // Soft serial RX/TX pins.
 
-SoftwareSerial ssSerial(SS_RX, SS_TX); // RX, TX
+// Ultrasonic sensor pins
+const int TRIG = 12;  // Trig pin connected to esp 12
+const int ECHO = 14;  // Echo pin connected to ESP 2
 
-//
+// DFPlayer Mini pins
+// Refer to dfplayer.ino for DFPlayer Mini code
+const int df_RX = 2, df_TX = 13;  // DFPlayer Mini SoftwareSerial pins
+
+const int SOUND_SPEED = 343;  // Sound velocity in m/s
+
+const double MIN_DISTANCE_CM = 10.0;  // Minimum safe distance in cm
+
+SoftwareSerial ssSerial(SS_RX, SS_TX);  // RX, TX
+SoftwareSerial dfSerial(df_RX, df_TX);  // RX, TX
+
+DFPlayerMini_Fast dfPlayer;
+
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
 //            Ensure ESP32 Wrover Module or other board with PSRAM is selected
 //            Partial images will be transmitted if image exceeds buffer size
@@ -23,7 +40,7 @@ SoftwareSerial ssSerial(SS_RX, SS_TX); // RX, TX
 // ===================
 // Select camera model
 // ===================
-#define CAMERA_MODEL_WROVER_KIT // Has PSRAM
+#define CAMERA_MODEL_WROVER_KIT  // Has PSRAM
 //#define CAMERA_MODEL_ESP_EYE  // Has PSRAM
 //#define CAMERA_MODEL_ESP32S3_EYE // Has PSRAM
 //#define CAMERA_MODEL_M5STACK_PSRAM // Has PSRAM
@@ -60,19 +77,46 @@ void setupLedFlash(int pin);
 // void rgt();
 
 void setup() {
-  
+
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
-  if (initPins) {
-  // // Initialize motor control pins
-  // pinMode(LF, OUTPUT);
-  // pinMode(LB, OUTPUT);
-  // pinMode(RF, OUTPUT);
-  // pinMode(RB, OUTPUT);
-  // pinMode(LSP_PWM, OUTPUT);
-  // pinMode(RSP_PWM, OUTPUT);
+
+  if (testUltrasonic) {
+    pinMode(ECHO, INPUT);
+    pinMode(TRIG, OUTPUT);
+    while (true) {
+      double distance = ultrasonicPulse();
+      Serial.print("Distance: ");
+      Serial.print(distance);
+      Serial.println(" cm");
+      delay(100);
+    }
   }
+
+  if (initPins) {
+    // // Initialize motor control pins
+    // pinMode(LF, OUTPUT);
+    // pinMode(LB, OUTPUT);
+    // pinMode(RF, OUTPUT);
+    // pinMode(RB, OUTPUT);
+    // pinMode(LSP_PWM, OUTPUT);
+    // pinMode(RSP_PWM, OUTPUT);
+  }
+
+  // DF Player Mini setup
+  dfSerial.begin(9600);
+  delay(100);  // Give DFPlayer time to initialize
+  if (dfPlayer.begin(dfSerial)) {
+    Serial.println("DFPlayer Mini initialized successfully!");
+    dfPlayer.volume(20);  // Set volume (0-30)
+    delay(100);
+    Serial.println("Ready to play audio file!");
+  } else {
+    Serial.println("Failed to initialize DFPlayer Mini!");
+    Serial.println("Check connections and SD card");
+  }
+
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -174,7 +218,7 @@ void setup() {
 
   // Initialize SoftwareSerial communication with Arduino Nano
   ssSerial.begin(9600);
-  delay(100); // Give nano time to initialize
+  delay(100);  // Give nano time to initialize
   Serial.println("SoftwareSerial initialized for sub-board communication");
 
   Serial.print("Camera Ready! Use 'http://");
@@ -201,6 +245,12 @@ void fwd() {
   SS_digitalWrite(RB, LOW);
   ss_analogWrite(LSP_PWM, leftSpeed);
   ss_analogWrite(RSP_PWM, rightSpeed);
+
+  // Check distance and stop if too close
+  if (ultrasonicPulse() < MIN_DISTANCE_CM) {
+    setSpeed(0, 0);  // Stop the robot
+    Serial.println("Obstacle detected! Stopping movement.");
+  }
 }
 
 void bck() {
@@ -235,21 +285,50 @@ void SS_digitalWrite(uint8_t pin, uint8_t val) {
   // Send digital write command to Arduino Nano in format "pin:value"
   String command = String(pin) + ":" + String(val);
   ssSerial.println(command);
-  
+
   // Debug output
   Serial.println("Sent to nano: " + command);
 }
 
+
+/// @brief Sends a PWM/analog write command to the Arduino Nano sub-controller
+/// @param pin The pin number to write to
+/// @param val The value to write (0-255)
 void ss_analogWrite(uint8_t pin, int val) {
   // Send PWM/analog write command to Arduino Nano in format "pin:value"
   // Constrain value to 0-255 range
   val = constrain(val, 0, 255);
-  
+
   String command = String(pin) + ":" + String(val);
   ssSerial.println(command);
-  
-  // Debug output  
+
+  // Debug output
   Serial.println("Sent to nano: " + command);
+}
+
+
+/// @brief Sends a pulse from the ultrasonic sensor and measures the echo time
+/// @return Distance measured by the ultrasonic sensor in centimeters
+double ultrasonicPulse() {
+  long duration;
+  double distance;
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+  duration = pulseIn(ECHO, HIGH, 30000);  // 30ms timeout
+  Serial.println(duration);
+  // duration is in microseconds and SOUND_SPEED is in m/s:
+  // convert duration to seconds (duration / 1e6), multiply by speed to get meters,
+  // divide by 2 for one-way, then convert to centimeters (*100).
+  distance = (duration / 1e6) * (double)SOUND_SPEED / 2.0 * 100.0;  // Calculate distance in cm
+  return distance;
+}
+
+void dfPlayerPlay() {
+  dfPlayer.play(1);  // Play the first (and only) track
 }
 
 void loop() {

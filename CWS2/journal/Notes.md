@@ -281,3 +281,7 @@ To integrate motor control into a web interface, the following steps were taken:
         httpd_register_uri_handler(camera_httpd, &tank_uri);
     ```
     - These steps tell the webserver to listen for requests to `/tank` and route them to the `tank_handler` function for processing - not doing this would result in a 404 Not Found error when trying to access the endpoint.
+
+## Ultrasonic Sensor Integration
+Trig -> Nano D6
+Echo -> ESP 2

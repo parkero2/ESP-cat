@@ -206,7 +206,7 @@ static esp_err_t tank_handler(httpd_req_t *req)
       // Params: query from, key, value out, size of value
       if (httpd_query_key_value(buf, "dir", direction, sizeof(direction)) == ESP_OK)
       {
-
+        setSpeed(128 , 128); // Reset speed to default before applying new speeds
         // Expected values of `direction`: fw, bw, lt, rt, st
         // strcmp compares strings (case sensitive). Returns 0 for identical
         if (strcmp(direction, "fw") == 0)
