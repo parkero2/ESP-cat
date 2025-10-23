@@ -25,9 +25,9 @@ const int SOUND_SPEED = 343;  // Sound velocity in m/s
 const double MIN_DISTANCE_CM = 10.0;  // Minimum safe distance in cm
 
 SoftwareSerial ssSerial(SS_RX, SS_TX);  // RX, TX
-SoftwareSerial dfSerial(df_RX, df_TX);  // RX, TX
+//SoftwareSerial dfSerial(df_RX, df_TX);  // RX, TX
 
-DFPlayerMini_Fast dfPlayer;
+//DFPlayerMini_Fast dfPlayer;
 
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
 //            Ensure ESP32 Wrover Module or other board with PSRAM is selected
@@ -63,8 +63,8 @@ DFPlayerMini_Fast dfPlayer;
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-const char *ssid = "ARACHNE 2.4";
-const char *password = "Arachne20!9";
+const char *ssid = "Valleyview";
+const char *password = "Littleseven7!";
 
 void startCameraServer();
 void setupLedFlash(int pin);
@@ -81,7 +81,8 @@ void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
-
+pinMode(ECHO, INPUT);
+    pinMode(TRIG, OUTPUT);
   if (testUltrasonic) {
     pinMode(ECHO, INPUT);
     pinMode(TRIG, OUTPUT);
@@ -105,17 +106,17 @@ void setup() {
   }
 
   // DF Player Mini setup
-  dfSerial.begin(9600);
-  delay(100);  // Give DFPlayer time to initialize
-  if (dfPlayer.begin(dfSerial)) {
-    Serial.println("DFPlayer Mini initialized successfully!");
-    dfPlayer.volume(20);  // Set volume (0-30)
-    delay(100);
-    Serial.println("Ready to play audio file!");
-  } else {
-    Serial.println("Failed to initialize DFPlayer Mini!");
-    Serial.println("Check connections and SD card");
-  }
+  // dfSerial.begin(9600);
+  // delay(100);  // Give DFPlayer time to initialize
+  // if (dfPlayer.begin(dfSerial)) {
+  //   Serial.println("DFPlayer Mini initialized successfully!");
+  //   dfPlayer.volume(20);  // Set volume (0-30)
+  //   delay(100);
+  //   Serial.println("Ready to play audio file!");
+  // } else {
+  //   Serial.println("Failed to initialize DFPlayer Mini!");
+  //   Serial.println("Check connections and SD card");
+  // }
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -231,11 +232,15 @@ int leftSpeed = 128;
 int rightSpeed = 128;
 
 void setSpeed(int l, int r) {
-  // constrain method ensures values are between 0 and 255, similar to map
-  leftSpeed = constrain(l, 0, 255);
-  rightSpeed = constrain(r, 0, 255);
-  analogWrite(LSP_PWM, leftSpeed);
-  analogWrite(RSP_PWM, rightSpeed);
+  // return;
+  // // constrain method ensures values are between 0 and 255, similar to map
+  // leftSpeed = constrain(l, 0, 255);
+  // rightSpeed = constrain(r, 0, 255);
+  // analogWrite(LSP_PWM, leftSpeed);
+  // analogWrite(RSP_PWM, rightSpeed);
+
+  SS_digitalWrite(LSP_PWM, l);
+  SS_digitalWrite(RSP_PWM, r);
 }
 
 void fwd() {
@@ -243,8 +248,7 @@ void fwd() {
   SS_digitalWrite(LB, LOW);
   SS_digitalWrite(RF, HIGH);
   SS_digitalWrite(RB, LOW);
-  ss_analogWrite(LSP_PWM, leftSpeed);
-  ss_analogWrite(RSP_PWM, rightSpeed);
+  setSpeed(255, 255);
 
   // Check distance and stop if too close
   if (ultrasonicPulse() < MIN_DISTANCE_CM) {
@@ -258,8 +262,7 @@ void bck() {
   SS_digitalWrite(LB, HIGH);
   SS_digitalWrite(RF, LOW);
   SS_digitalWrite(RB, HIGH);
-  ss_analogWrite(LSP_PWM, leftSpeed);
-  ss_analogWrite(RSP_PWM, rightSpeed);
+  setSpeed(255, 255);
 }
 
 void lft() {
@@ -267,8 +270,7 @@ void lft() {
   SS_digitalWrite(LB, HIGH);
   SS_digitalWrite(RF, HIGH);
   SS_digitalWrite(RB, LOW);
-  ss_analogWrite(LSP_PWM, leftSpeed);
-  ss_analogWrite(RSP_PWM, rightSpeed);
+  setSpeed(255, 255);
 }
 
 void rgt() {
@@ -276,8 +278,7 @@ void rgt() {
   SS_digitalWrite(LB, LOW);
   SS_digitalWrite(RF, LOW);
   SS_digitalWrite(RB, HIGH);
-  ss_analogWrite(LSP_PWM, leftSpeed);
-  ss_analogWrite(RSP_PWM, rightSpeed);
+  setSpeed(255, 255);
 }
 
 // Sub board controls
@@ -324,14 +325,20 @@ double ultrasonicPulse() {
   // convert duration to seconds (duration / 1e6), multiply by speed to get meters,
   // divide by 2 for one-way, then convert to centimeters (*100).
   distance = (duration / 1e6) * (double)SOUND_SPEED / 2.0 * 100.0;  // Calculate distance in cm
+  Serial.print("Distance: ");
+  Serial.println(distance);
   return distance;
 }
 
 void dfPlayerPlay() {
-  dfPlayer.play(1);  // Play the first (and only) track
+  //dfPlayer.play(1);  // Play the first (and only) track
 }
 
 void loop() {
   // Do nothing. Everything is done in another task by the web server
-  delay(10000);
+  if (ultrasonicPulse() < MIN_DISTANCE_CM) {
+    setSpeed(0, 0);  // Stop the robot
+    Serial.println("Obstacle detected in loop! Stopping movement.");
+  }
+  delay(500);
 }
